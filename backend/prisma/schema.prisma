@@ -1,0 +1,360 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PLAYER
+  ADMIN
+}
+
+enum CurrencyType {
+  AURUM
+  LUMEN
+}
+
+enum ItemCategory {
+  CONSUMABLE
+  EQUIPMENT
+  MATERIAL
+  COSMETIC
+}
+
+enum QuestType {
+  DAILY
+  WEEKLY
+  REPEATABLE
+}
+
+enum SagaDifficulty {
+  NORMAL
+  HARD
+}
+
+enum MatchType {
+  ARENA
+  RANKED
+  TOURNAMENT
+}
+
+enum AuditAction {
+  LOGIN
+  TRANSACTION
+  PVP
+  DROP
+  ADMIN
+}
+
+enum ClanRole {
+  LEADER
+  OFFICER
+  MEMBER
+}
+
+enum TrainingStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  CANCELLED
+}
+
+enum EquipmentSlot {
+  HEAD
+  BODY
+  HANDS
+  ACCESSORY
+  FEET
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  username       String   @unique
+  passwordHash   String
+  legacyMd5      Boolean  @default(false)
+  role           UserRole @default(PLAYER)
+  twoFactorSecret String?
+  preferences    Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  characters     Character[]
+  refreshTokens  RefreshToken[]
+  auditLogs      AuditLog[]
+  clanMembers    ClanMember[]
+  friends        Friend[] @relation("friends")
+  blockedUsers   Block[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  revoked   Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model RaceClass {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  baseStats   Json
+  characters  Character[]
+}
+
+model Character {
+  id           String   @id @default(uuid())
+  userId       String
+  name         String
+  avatarUrl    String?
+  raceClassId  String
+  level        Int      @default(1)
+  experience   Int      @default(0)
+  hp           Int      @default(100)
+  ki           Int      @default(50)
+  stamina      Int      @default(100)
+  attributes   Json
+  titles       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+  raceClass    RaceClass @relation(fields: [raceClassId], references: [id])
+  inventory    InventoryItem[]
+  equipment    Equipment[]
+  trainingSessions TrainingSession[]
+  questProgress QuestProgress[]
+  clanMembers  ClanMember[]
+  arenaAttacks ArenaMatch[] @relation("ArenaAttacker")
+  arenaDefenses ArenaMatch[] @relation("ArenaDefender")
+}
+
+model Item {
+  id          String       @id @default(uuid())
+  name        String
+  description String
+  category    ItemCategory
+  rarity      String
+  effects     Json?
+  stackable   Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  inventoryItems InventoryItem[]
+  shopItems   ShopItem[]
+}
+
+model InventoryItem {
+  id           String   @id @default(uuid())
+  characterId  String
+  itemId       String
+  quantity     Int      @default(1)
+  equippedSlot EquipmentSlot?
+  character    Character @relation(fields: [characterId], references: [id])
+  item         Item      @relation(fields: [itemId], references: [id])
+}
+
+model Equipment {
+  id          String        @id @default(uuid())
+  characterId String
+  itemId      String
+  slot        EquipmentSlot
+  character   Character     @relation(fields: [characterId], references: [id])
+  item        Item          @relation(fields: [itemId], references: [id])
+}
+
+model Wallet {
+  id          String   @id @default(uuid())
+  characterId String   @unique
+  aurum       Int      @default(0)
+  lumen       Int      @default(0)
+  history     Json?
+  character   Character @relation(fields: [characterId], references: [id])
+}
+
+model Quest {
+  id          String    @id @default(uuid())
+  name        String
+  description String
+  type        QuestType
+  objectives  Json
+  rewards     Json
+  createdAt   DateTime  @default(now())
+  progress    QuestProgress[]
+}
+
+model QuestProgress {
+  id          String   @id @default(uuid())
+  characterId String
+  questId     String
+  progress    Int      @default(0)
+  claimed     Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+  character   Character @relation(fields: [characterId], references: [id])
+  quest       Quest      @relation(fields: [questId], references: [id])
+}
+
+model TrainingSession {
+  id          String         @id @default(uuid())
+  characterId String
+  status      TrainingStatus @default(QUEUED)
+  startedAt   DateTime?
+  endsAt      DateTime?
+  rewards     Json?
+  createdAt   DateTime       @default(now())
+  character   Character      @relation(fields: [characterId], references: [id])
+}
+
+model SagaChapter {
+  id          String   @id @default(uuid())
+  title       String
+  synopsis    String
+  difficulty  SagaDifficulty
+  requirements Json
+  rewards     Json
+}
+
+model ArenaMatch {
+  id           String   @id @default(uuid())
+  attackerId   String
+  defenderId   String
+  matchType    MatchType
+  result       String
+  replay       Json
+  createdAt    DateTime @default(now())
+  attacker     Character @relation("ArenaAttacker", fields: [attackerId], references: [id])
+  defender     Character @relation("ArenaDefender", fields: [defenderId], references: [id])
+}
+
+model Season {
+  id          String   @id @default(uuid())
+  name        String
+  startsAt    DateTime
+  endsAt      DateTime
+  rewards     Json
+}
+
+model Ranking {
+  id          String   @id @default(uuid())
+  characterId String
+  xp          Int
+  power       Int
+  elo         Int
+  seasonId    String
+  character   Character @relation(fields: [characterId], references: [id])
+  season      Season    @relation(fields: [seasonId], references: [id])
+}
+
+model Tournament {
+  id          String   @id @default(uuid())
+  name        String
+  scheduledAt DateTime
+  entryCost   Int
+  rewards     Json
+  bracket     Json
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  startsAt    DateTime
+  endsAt      DateTime
+  rewards     Json
+}
+
+model Challenge {
+  id          String   @id @default(uuid())
+  name        String
+  bossStats   Json
+  rewards     Json
+  weeklyReset DateTime
+}
+
+model DailyRewardClaim {
+  id          String   @id @default(uuid())
+  characterId String
+  dayIndex    Int
+  claimedAt   DateTime @default(now())
+  character   Character @relation(fields: [characterId], references: [id])
+}
+
+model ShopItem {
+  id          String   @id @default(uuid())
+  itemId      String
+  price       Int
+  currency    CurrencyType
+  item        Item @relation(fields: [itemId], references: [id])
+}
+
+model Coupon {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  rewards     Json
+  active      Boolean  @default(true)
+  expiresAt   DateTime
+}
+
+model TransactionLog {
+  id          String   @id @default(uuid())
+  characterId String
+  type        String
+  delta       Int
+  currency    CurrencyType
+  meta        Json
+  createdAt   DateTime @default(now())
+}
+
+model Clan {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  createdAt   DateTime @default(now())
+  bank        Int      @default(0)
+  members     ClanMember[]
+}
+
+model ClanMember {
+  id          String   @id @default(uuid())
+  clanId      String
+  characterId String
+  role        ClanRole @default(MEMBER)
+  joinedAt    DateTime @default(now())
+  clan        Clan     @relation(fields: [clanId], references: [id])
+  character   Character @relation(fields: [characterId], references: [id])
+}
+
+model ChatMessage {
+  id          String   @id @default(uuid())
+  channel     String
+  content     String
+  senderId    String
+  createdAt   DateTime @default(now())
+}
+
+model Friend {
+  id          String   @id @default(uuid())
+  userId      String
+  friendId    String
+  createdAt   DateTime @default(now())
+  user        User     @relation("friends", fields: [userId], references: [id])
+}
+
+model Block {
+  id          String   @id @default(uuid())
+  userId      String
+  blockedId   String
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id        String      @id @default(uuid())
+  userId    String
+  action    AuditAction
+  metadata  Json
+  createdAt DateTime    @default(now())
+  user      User        @relation(fields: [userId], references: [id])
+}
