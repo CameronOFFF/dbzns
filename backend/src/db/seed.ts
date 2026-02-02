@@ -1,4 +1,7 @@
+import dotenv from 'dotenv';
 import { query } from './mysql.js';
+
+dotenv.config();
 
 async function seed() {
   await query(

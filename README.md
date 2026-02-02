@@ -125,6 +125,7 @@ Sistema por turnos automáticos:
 cd backend
 cp .env.example .env
 # Ajuste DB_HOST, DB_USER, DB_PASSWORD, DB_NAME para o MySQL do XAMPP
+# (O seed e o servidor carregam variáveis do .env automaticamente)
 npm install
 npm run seed
 npm run dev
