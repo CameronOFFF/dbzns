@@ -1,0 +1,274 @@
+CREATE DATABASE IF NOT EXISTS rpg CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE rpg;
+
+CREATE TABLE IF NOT EXISTS users (
+  id CHAR(36) PRIMARY KEY,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  username VARCHAR(50) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  legacy_md5 TINYINT(1) NOT NULL DEFAULT 0,
+  role ENUM('PLAYER','ADMIN') NOT NULL DEFAULT 'PLAYER',
+  two_factor_secret VARCHAR(255) NULL,
+  preferences JSON NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id CHAR(36) PRIMARY KEY,
+  token VARCHAR(512) NOT NULL UNIQUE,
+  user_id CHAR(36) NOT NULL,
+  revoked TINYINT(1) NOT NULL DEFAULT 0,
+  expires_at DATETIME NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS race_classes (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(100) NOT NULL UNIQUE,
+  description TEXT NOT NULL,
+  base_stats JSON NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS characters (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  avatar_url VARCHAR(255) NULL,
+  race_class_id CHAR(36) NOT NULL,
+  level INT NOT NULL DEFAULT 1,
+  experience INT NOT NULL DEFAULT 0,
+  hp INT NOT NULL DEFAULT 100,
+  ki INT NOT NULL DEFAULT 50,
+  stamina INT NOT NULL DEFAULT 100,
+  attributes JSON NOT NULL,
+  titles VARCHAR(255) NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (race_class_id) REFERENCES race_classes(id)
+);
+
+CREATE TABLE IF NOT EXISTS wallets (
+  id CHAR(36) PRIMARY KEY,
+  character_id CHAR(36) NOT NULL UNIQUE,
+  aurum INT NOT NULL DEFAULT 0,
+  lumen INT NOT NULL DEFAULT 0,
+  history JSON NULL,
+  FOREIGN KEY (character_id) REFERENCES characters(id)
+);
+
+CREATE TABLE IF NOT EXISTS items (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  description TEXT NOT NULL,
+  category ENUM('CONSUMABLE','EQUIPMENT','MATERIAL','COSMETIC') NOT NULL,
+  rarity VARCHAR(50) NOT NULL,
+  effects JSON NULL,
+  stackable TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS inventory_items (
+  id CHAR(36) PRIMARY KEY,
+  character_id CHAR(36) NOT NULL,
+  item_id CHAR(36) NOT NULL,
+  quantity INT NOT NULL DEFAULT 1,
+  equipped_slot ENUM('HEAD','BODY','HANDS','ACCESSORY','FEET') NULL,
+  FOREIGN KEY (character_id) REFERENCES characters(id),
+  FOREIGN KEY (item_id) REFERENCES items(id)
+);
+
+CREATE TABLE IF NOT EXISTS equipment (
+  id CHAR(36) PRIMARY KEY,
+  character_id CHAR(36) NOT NULL,
+  item_id CHAR(36) NOT NULL,
+  slot ENUM('HEAD','BODY','HANDS','ACCESSORY','FEET') NOT NULL,
+  FOREIGN KEY (character_id) REFERENCES characters(id),
+  FOREIGN KEY (item_id) REFERENCES items(id)
+);
+
+CREATE TABLE IF NOT EXISTS quests (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  description TEXT NOT NULL,
+  type ENUM('DAILY','WEEKLY','REPEATABLE') NOT NULL,
+  objectives JSON NOT NULL,
+  rewards JSON NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS quest_progress (
+  id CHAR(36) PRIMARY KEY,
+  character_id CHAR(36) NOT NULL,
+  quest_id CHAR(36) NOT NULL,
+  progress INT NOT NULL DEFAULT 0,
+  claimed TINYINT(1) NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (character_id) REFERENCES characters(id),
+  FOREIGN KEY (quest_id) REFERENCES quests(id)
+);
+
+CREATE TABLE IF NOT EXISTS training_sessions (
+  id CHAR(36) PRIMARY KEY,
+  character_id CHAR(36) NOT NULL,
+  status ENUM('QUEUED','RUNNING','COMPLETED','CANCELLED') NOT NULL DEFAULT 'QUEUED',
+  started_at DATETIME NULL,
+  ends_at DATETIME NULL,
+  rewards JSON NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (character_id) REFERENCES characters(id)
+);
+
+CREATE TABLE IF NOT EXISTS saga_chapters (
+  id CHAR(36) PRIMARY KEY,
+  title VARCHAR(150) NOT NULL,
+  synopsis TEXT NOT NULL,
+  difficulty ENUM('NORMAL','HARD') NOT NULL,
+  requirements JSON NOT NULL,
+  rewards JSON NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS arena_matches (
+  id CHAR(36) PRIMARY KEY,
+  attacker_id CHAR(36) NOT NULL,
+  defender_id CHAR(36) NOT NULL,
+  match_type ENUM('ARENA','RANKED','TOURNAMENT') NOT NULL,
+  result VARCHAR(20) NOT NULL,
+  replay JSON NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (attacker_id) REFERENCES characters(id),
+  FOREIGN KEY (defender_id) REFERENCES characters(id)
+);
+
+CREATE TABLE IF NOT EXISTS seasons (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  starts_at DATETIME NOT NULL,
+  ends_at DATETIME NOT NULL,
+  rewards JSON NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS rankings (
+  id CHAR(36) PRIMARY KEY,
+  character_id CHAR(36) NOT NULL,
+  xp INT NOT NULL,
+  power INT NOT NULL,
+  elo INT NOT NULL,
+  season_id CHAR(36) NOT NULL,
+  FOREIGN KEY (character_id) REFERENCES characters(id),
+  FOREIGN KEY (season_id) REFERENCES seasons(id)
+);
+
+CREATE TABLE IF NOT EXISTS tournaments (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  scheduled_at DATETIME NOT NULL,
+  entry_cost INT NOT NULL,
+  rewards JSON NOT NULL,
+  bracket JSON NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS events (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  description TEXT NOT NULL,
+  starts_at DATETIME NOT NULL,
+  ends_at DATETIME NOT NULL,
+  rewards JSON NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS challenges (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  boss_stats JSON NOT NULL,
+  rewards JSON NOT NULL,
+  weekly_reset DATETIME NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS daily_reward_claims (
+  id CHAR(36) PRIMARY KEY,
+  character_id CHAR(36) NOT NULL,
+  day_index INT NOT NULL,
+  claimed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (character_id) REFERENCES characters(id)
+);
+
+CREATE TABLE IF NOT EXISTS shop_items (
+  id CHAR(36) PRIMARY KEY,
+  item_id CHAR(36) NOT NULL,
+  price INT NOT NULL,
+  currency ENUM('AURUM','LUMEN') NOT NULL,
+  FOREIGN KEY (item_id) REFERENCES items(id)
+);
+
+CREATE TABLE IF NOT EXISTS coupons (
+  id CHAR(36) PRIMARY KEY,
+  code VARCHAR(50) NOT NULL UNIQUE,
+  rewards JSON NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  expires_at DATETIME NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS transaction_logs (
+  id CHAR(36) PRIMARY KEY,
+  character_id CHAR(36) NOT NULL,
+  type VARCHAR(50) NOT NULL,
+  delta INT NOT NULL,
+  currency ENUM('AURUM','LUMEN') NOT NULL,
+  meta JSON NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (character_id) REFERENCES characters(id)
+);
+
+CREATE TABLE IF NOT EXISTS clans (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(100) NOT NULL UNIQUE,
+  description TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  bank INT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS clan_members (
+  id CHAR(36) PRIMARY KEY,
+  clan_id CHAR(36) NOT NULL,
+  character_id CHAR(36) NOT NULL,
+  role ENUM('LEADER','OFFICER','MEMBER') NOT NULL DEFAULT 'MEMBER',
+  joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (clan_id) REFERENCES clans(id),
+  FOREIGN KEY (character_id) REFERENCES characters(id)
+);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id CHAR(36) PRIMARY KEY,
+  channel VARCHAR(100) NOT NULL,
+  content TEXT NOT NULL,
+  sender_id CHAR(36) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS friends (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  friend_id CHAR(36) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS blocks (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  blocked_id CHAR(36) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id CHAR(36) PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  action ENUM('LOGIN','TRANSACTION','PVP','DROP','ADMIN') NOT NULL,
+  metadata JSON NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
