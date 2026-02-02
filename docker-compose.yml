@@ -1,0 +1,39 @@
+version: '3.9'
+services:
+  mysql:
+    image: mysql:8.4
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: rpg
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  backend:
+    build: ./backend
+    environment:
+      PORT: 4000
+      DATABASE_URL: mysql://root:password@mysql:3306/rpg
+      JWT_SECRET: change_me
+      JWT_REFRESH_SECRET: change_me_refresh
+      CORS_ORIGIN: http://localhost:5173
+      LEGACY_MD5: "false"
+    ports:
+      - "4000:4000"
+    depends_on:
+      - mysql
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_URL: http://localhost:4000
+      VITE_SOCKET_URL: http://localhost:4000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
